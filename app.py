@@ -1,224 +1,119 @@
 import streamlit as st
 import os
+import time
 import re
 from dotenv import load_dotenv
 from google import genai
 
 
-# ============================================================
+# =========================================================
 # PAGE CONFIGURATION
-# ============================================================
+# =========================================================
 
 st.set_page_config(
     page_title="SkillBridge AI",
     page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="wide"
 )
 
 
-# ============================================================
-# ADVANCED UI / CSS
-# ============================================================
+# =========================================================
+# LOAD API KEY
+# =========================================================
+
+load_dotenv()
+
+api_key = os.getenv("GEMINI_API_KEY")
+
+# Streamlit Cloud Secrets support
+if not api_key:
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        pass
+
+
+# =========================================================
+# CUSTOM CSS
+# =========================================================
 
 st.markdown("""
 <style>
 
 .stApp {
-    background: linear-gradient(135deg, #0f172a, #111827, #1e293b);
+    background-color: #111827;
     color: white;
 }
 
-.block-container {
-    max-width: 1050px;
-    padding-top: 2rem;
-    padding-bottom: 3rem;
+.main {
+    background-color: #111827;
 }
 
-/* Main Title */
-.main-title {
-    text-align: center;
-    font-size: 3.2rem;
-    font-weight: 800;
-    margin-bottom: 0;
-    background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+h1, h2, h3 {
+    color: white;
 }
 
-.subtitle {
-    text-align: center;
-    font-size: 1.2rem;
-    color: #cbd5e1;
-    margin-bottom: 2rem;
+div[data-testid="stTextInput"] input,
+div[data-testid="stTextArea"] textarea {
+    background-color: #2b2d38;
+    color: white;
+    border-radius: 10px;
 }
 
-/* Cards */
-.custom-card {
-    background: rgba(30, 41, 59, 0.85);
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    padding: 25px;
-    border-radius: 18px;
-    margin-bottom: 20px;
-    box-shadow: 0px 8px 25px rgba(0,0,0,0.25);
+div[data-testid="stSelectbox"] div {
+    border-radius: 10px;
 }
 
-/* Score Card */
-.score-card {
-    text-align: center;
-    background: linear-gradient(135deg, #1e3a8a, #312e81);
-    padding: 30px;
-    border-radius: 20px;
-    margin: 20px 0;
-    border: 1px solid #6366f1;
-}
-
-.score-number {
-    font-size: 4rem;
-    font-weight: bold;
-    color: #67e8f9;
-}
-
-/* Button */
 .stButton > button {
-    width: 100%;
-    border-radius: 12px;
-    height: 55px;
-    font-size: 18px;
-    font-weight: bold;
-    border: none;
     background: linear-gradient(90deg, #2563eb, #7c3aed);
     color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 25px;
+    font-weight: bold;
 }
 
-.stButton > button:hover {
-    background: linear-gradient(90deg, #1d4ed8, #6d28d9);
-}
-
-/* Input Fields */
-.stTextInput input,
-.stTextArea textarea,
-.stSelectbox div {
-    border-radius: 10px !important;
-}
-
-/* Section headings */
-h2, h3 {
-    color: #e2e8f0;
-}
-
-/* Footer */
-.footer {
-    text-align: center;
-    color: #94a3b8;
-    margin-top: 40px;
-    font-size: 14px;
+.result-box {
+    background-color: #1f2937;
+    padding: 20px;
+    border-radius: 15px;
+    margin-top: 10px;
+    border: 1px solid #374151;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 
-# ============================================================
-# GEMINI API CONFIGURATION
-# ============================================================
-
-load_dotenv()
-
-api_key = None
-
-# Try Streamlit Cloud Secrets first
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-except Exception:
-    pass
-
-
-# If Streamlit Secrets doesn't work, try local .env
-if not api_key:
-    api_key = os.getenv("GEMINI_API_KEY")
-
-
-# Stop if API key is missing
-if not api_key:
-    st.error("❌ Gemini API key not found.")
-    st.info("Please configure GEMINI_API_KEY in Streamlit Secrets.")
-    st.stop()
-
-
-# Create Gemini Client
-try:
-    client = genai.Client(api_key=api_key)
-
-except Exception as e:
-    st.error("❌ Unable to initialize Gemini API.")
-    st.error(str(e))
-    st.stop()
-
-
-# ============================================================
-# FUNCTIONS
-# ============================================================
-
-def extract_score(text):
-    """
-    Extract Skill Match Score from AI response.
-    """
-
-    patterns = [
-        r"SKILL_MATCH_SCORE\s*:\s*(\d+)",
-        r"Skill Match Score\s*:\s*(\d+)",
-        r"(\d+)%"
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-
-        if match:
-            score = int(match.group(1))
-
-            if 0 <= score <= 100:
-                return score
-
-    return 50
-
-
-def get_score_message(score):
-
-    if score >= 80:
-        return "Excellent! You have a strong foundation for this career. 🚀"
-
-    elif score >= 60:
-        return "Good progress! A few important skills can make you stronger. 💪"
-
-    elif score >= 40:
-        return "You have a foundation, but you should focus on developing key skills. 📚"
-
-    else:
-        return "You are at the beginning of your journey. Follow the roadmap and keep learning! 🌱"
-
-
-# ============================================================
-# HEADER
-# ============================================================
+# =========================================================
+# TITLE
+# =========================================================
 
 st.markdown(
-    '<h1 class="main-title">🎯 SkillBridge AI</h1>',
+    "<h1 style='text-align: center;'>🎯 SkillBridge AI</h1>",
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<p class="subtitle">Your Skills. Your Path. Your Future.</p>',
+    "<p style='text-align: center; font-size:18px;'>"
+    "Your Skills. Your Path. Your Future."
+    "</p>",
     unsafe_allow_html=True
 )
 
+st.write("")
+
+
+# =========================================================
+# INTRODUCTION BOX
+# =========================================================
 
 st.markdown("""
-<div class="custom-card">
+<div class="result-box">
 
-<h3>🤖 AI-Powered Career & Skill Development Assistant</h3>
+<h2>🤖 AI-Powered Career & Skill Development Assistant</h2>
 
-<p>
+<p style="font-size:17px;">
 Discover the skills required for your dream career, identify your skill gaps,
 and receive a personalized learning roadmap designed for your career goals.
 </p>
@@ -227,14 +122,17 @@ and receive a personalized learning roadmap designed for your career goals.
 """, unsafe_allow_html=True)
 
 
-# ============================================================
-# USER INPUT SECTION
-# ============================================================
+st.write("")
+st.write("")
 
-st.markdown("## 👤 Build Your Career Profile")
+
+# =========================================================
+# PROFILE FORM
+# =========================================================
+
+st.markdown("# 👥 Build Your Career Profile")
 
 col1, col2 = st.columns(2)
-
 
 with col1:
 
@@ -248,7 +146,7 @@ with col1:
         placeholder="Example: B.E Computer Science"
     )
 
-    career_goal = st.text_input(
+    job_role = st.text_input(
         "🎯 Desired Job Role",
         placeholder="Example: Data Analyst"
     )
@@ -256,13 +154,13 @@ with col1:
 
 with col2:
 
-    experience_level = st.selectbox(
+    experience = st.selectbox(
         "📊 Experience Level",
         [
             "Student / Beginner",
             "Fresher",
-            "Intern",
-            "1-2 Years Experience",
+            "0-1 Years Experience",
+            "1-3 Years Experience",
             "3+ Years Experience"
         ]
     )
@@ -273,7 +171,7 @@ with col2:
     )
 
     learning_time = st.selectbox(
-        "⏳ Weekly Learning Time",
+        "⌛ Weekly Learning Time",
         [
             "3-5 Hours",
             "5-10 Hours",
@@ -283,358 +181,432 @@ with col2:
     )
 
 
-current_skills = st.text_area(
+skills = st.text_area(
     "💻 Your Current Skills",
-    placeholder="Example: Python, Java, SQL, Excel",
-    height=120
+    placeholder="Example: Python, Java, SQL, Excel"
 )
 
 
-# ============================================================
-# ANALYZE BUTTON
-# ============================================================
-
-st.markdown("---")
-
-analyze = st.button(
-    "🚀 Analyze My Skills & Build My Career Roadmap"
-)
+st.write("")
+st.write("")
 
 
-# ============================================================
-# AI ANALYSIS
-# ============================================================
+# =========================================================
+# LOCAL FALLBACK ANALYSIS
+# =========================================================
 
-if analyze:
+def create_fallback_analysis(job_role, skills, company):
 
-    if not name or not education or not current_skills or not career_goal or not company:
+    skills_list = [
+        skill.strip()
+        for skill in skills.split(",")
+        if skill.strip()
+    ]
 
-        st.warning("⚠️ Please fill in all required fields.")
+    role_lower = job_role.lower()
+
+    if "data" in role_lower and "analyst" in role_lower:
+        required_skills = [
+            "Advanced Excel",
+            "SQL",
+            "Python",
+            "Power BI or Tableau",
+            "Statistics",
+            "Data Visualization"
+        ]
+
+    elif "software" in role_lower or "developer" in role_lower:
+        required_skills = [
+            "Programming Language",
+            "Data Structures and Algorithms",
+            "Object Oriented Programming",
+            "Git and GitHub",
+            "Database Management",
+            "Projects and Problem Solving"
+        ]
+
+    elif "web" in role_lower:
+        required_skills = [
+            "HTML",
+            "CSS",
+            "JavaScript",
+            "React",
+            "Backend Development",
+            "Git and GitHub"
+        ]
+
+    elif "ai" in role_lower or "machine learning" in role_lower:
+        required_skills = [
+            "Python",
+            "Mathematics and Statistics",
+            "Machine Learning",
+            "Data Analysis",
+            "Deep Learning Basics",
+            "AI Projects"
+        ]
 
     else:
+        required_skills = [
+            "Communication Skills",
+            "Technical Fundamentals",
+            "Problem Solving",
+            "Industry Knowledge",
+            "Projects",
+            "Interview Preparation"
+        ]
+
+    current_skills = ", ".join(skills_list)
+
+    missing_skills = []
+
+    for required in required_skills:
+
+        found = False
+
+        for user_skill in skills_list:
+            if required.lower() in user_skill.lower():
+                found = True
+
+        if not found:
+            missing_skills.append(required)
+
+    if len(missing_skills) == 0:
+        missing_skills = [
+            "Advanced Projects",
+            "Interview Preparation",
+            "Industry-Level Experience"
+        ]
+
+    company_text = company if company.strip() else "your target companies"
+
+    result = f"""
+
+## 🎯 Career Analysis
+
+Your selected career goal is **{job_role}**.
+
+You currently have skills in:
+
+**{current_skills if current_skills else "Skills need to be added"}**
+
+Your learning journey should focus on improving the technical and practical skills
+required for a **{job_role}** role.
+
+Since you are interested in **{company_text}**, you should also focus on
+strong projects, problem-solving skills, communication, and interview preparation.
+
+---
+
+## ✅ Current Skills
+
+{chr(10).join([f"- {skill}" for skill in skills_list]) if skills_list else "- No skills entered"}
+
+---
+
+## ❌ Skills to Improve
+
+{chr(10).join([f"- {skill}" for skill in missing_skills])}
+
+---
+
+## 📚 Personalized Learning Roadmap
+
+### Step 1: Strengthen Your Fundamentals
+
+Focus on the basic concepts required for **{job_role}**.
+
+### Step 2: Learn Missing Technical Skills
+
+Start learning:
+
+{chr(10).join([f"- {skill}" for skill in missing_skills[:3]])}
+
+### Step 3: Build Practical Projects
+
+Create at least **2-3 projects** related to **{job_role}**.
+
+### Step 4: Improve Your Portfolio
+
+Upload your projects to GitHub and create a strong resume.
+
+### Step 5: Prepare for Interviews
+
+Practice:
+
+- Technical questions
+- Problem-solving
+- Communication skills
+- Mock interviews
+
+---
+
+## 💼 Suggested Entry-Level Job Roles
+
+- Junior {job_role}
+- {job_role} Intern
+- Trainee
+- Associate
+
+---
+
+## 🏢 Company Preparation Advice
+
+For companies like **{company_text}**, focus on:
+
+- Strong fundamentals
+- Practical projects
+- Problem-solving
+- Communication
+- Resume preparation
+- Technical interview preparation
+
+---
+
+### ⭐ Final Advice
+
+Follow your learning roadmap consistently and build practical projects.
+Skill development takes time, so focus on continuous improvement.
+
+"""
+
+    return result
+
+
+# =========================================================
+# GEMINI AI FUNCTION WITH RETRIES
+# =========================================================
+
+def analyze_with_ai(
+    name,
+    education,
+    skills,
+    job_role,
+    company,
+    experience,
+    learning_time
+):
+
+    if not api_key:
+        return None, "Gemini API key not found."
+
+    try:
+
+        client = genai.Client(api_key=api_key)
 
         prompt = f"""
-You are SkillBridge AI, an intelligent Career and Skill Development Agent.
+You are SkillBridge AI, an intelligent Career and Skill Development Assistant.
 
-Analyze the following user profile carefully.
+Analyze the following user's career profile and provide personalized career guidance.
 
 USER PROFILE:
 
 Name: {name}
 
-Education:
-{education}
+Education: {education}
 
-Current Skills:
-{current_skills}
+Current Skills: {skills}
 
-Desired Job Role:
-{career_goal}
+Desired Job Role: {job_role}
 
-Experience Level:
-{experience_level}
+Dream Company: {company}
 
-Target Company:
-{company}
+Experience Level: {experience}
 
-Available Weekly Learning Time:
-{learning_time}
+Weekly Learning Time: {learning_time}
 
 
-YOUR TASK:
+Your responsibilities:
 
-Analyze the user's profile and provide personalized career guidance.
+1. Analyze the user's career goal.
+2. Analyze the user's current skills.
+3. Identify important skills required for the desired job role.
+4. Identify missing skills or skill gaps.
+5. Consider the user's dream company if provided.
+6. Create a personalized learning roadmap.
+7. Suggest suitable beginner or entry-level job roles.
+8. Give practical advice for improving employability.
 
 IMPORTANT:
 
-First calculate an estimated Skill Match Score from 0 to 100.
+- Do not guarantee that the user will get a job.
+- Be encouraging.
+- Keep the advice practical.
+- Use simple language.
+- Provide a clear step-by-step roadmap.
 
-Write the score EXACTLY in this format:
-
-SKILL_MATCH_SCORE: number
-
-
-Then provide the following sections.
-
+Use EXACTLY these sections:
 
 ## 🎯 Career Analysis
 
-Explain whether the user's background is suitable for the desired career.
-
-
-## 📊 Why This Score Was Given
-
-Explain clearly why the Skill Match Score was assigned.
-
-
 ## ✅ Current Skills
-
-List the user's strengths and relevant skills.
-
 
 ## ❌ Skills to Improve
 
-List important missing or weak skills.
-
-
-## 🏢 Target Company Preparation
-
-Provide general preparation guidance for working toward opportunities at the target company.
-
-Do NOT claim access to confidential company hiring requirements.
-
-Clearly state that actual job requirements may vary.
-
+## 🏢 Skills Recommended for the Dream Company
 
 ## 📚 Personalized Learning Roadmap
 
-Create a practical roadmap.
-
-Divide it into:
-
-### Phase 1: Foundation Skills
-
-### Phase 2: Core Technical Skills
-
-### Phase 3: Advanced Skills
-
-### Phase 4: Projects and Portfolio
-
-Make the roadmap suitable for the user's experience level and weekly learning time.
-
-
-## 💡 Recommended Projects
-
-Suggest 3 practical portfolio projects relevant to the desired job role.
-
-For each project provide:
-
-1. Project Name
-2. Skills Used
-3. Brief Description
-
-
 ## 💼 Suggested Job Roles
 
-Suggest suitable beginner or entry-level roles.
-
-
-## 🎯 Final Career Advice
-
-Provide encouraging but realistic career advice.
-
-Use simple language.
-
-Do NOT guarantee employment.
-
-Do NOT claim that completing the roadmap guarantees a job.
-
-Keep the response structured, practical, personalized, and suitable for a student or beginner.
+## ⭐ Final Career Advice
 """
 
+        # Models to try
+        models_to_try = [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash"
+        ]
 
-        try:
+        last_error = ""
 
-            with st.spinner(
-                "🤖 SkillBridge AI is analyzing your profile..."
-            ):
+        for model_name in models_to_try:
 
-                # ====================================================
-                # GEMINI AI MODEL
-                # ====================================================
+            # Try 3 times for temporary overload
+            for attempt in range(3):
 
-                response = client.models.generate_content(
-                    model="gemini-3.6-flash",
-                    contents=prompt
-                )
+                try:
 
-                analysis = response.text
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+
+                    if response and response.text:
+                        return response.text, None
+
+                except Exception as e:
+
+                    last_error = str(e)
+
+                    # Wait before retrying
+                    time.sleep(2 * (attempt + 1))
+
+        return None, last_error
+
+    except Exception as e:
+
+        return None, str(e)
 
 
-            # ====================================================
-            # SUCCESS MESSAGE
-            # ====================================================
+# =========================================================
+# ANALYZE BUTTON
+# =========================================================
 
-            st.success("🎉 Analysis Completed Successfully!")
+if st.button(
+    "🚀 Analyze My Skills & Build My Career Roadmap",
+    use_container_width=False
+):
 
+    # Validation
+    if not education or not job_role or not skills:
 
-            # ====================================================
-            # SKILL MATCH SCORE
-            # ====================================================
+        st.warning(
+            "⚠️ Please enter your Education, Desired Job Role, and Current Skills."
+        )
 
-            score = extract_score(analysis)
+    else:
 
+        with st.spinner("🤖 SkillBridge AI is analyzing your career profile..."):
 
-            # Remove score line from displayed AI analysis
-            analysis = re.sub(
-                r"SKILL_MATCH_SCORE\s*:\s*\d+",
-                "",
-                analysis,
-                flags=re.IGNORECASE
+            ai_result, error = analyze_with_ai(
+                name,
+                education,
+                skills,
+                job_role,
+                company,
+                experience,
+                learning_time
             )
 
+        # =====================================================
+        # SHOW AI RESULT
+        # =====================================================
 
-            st.markdown(
-                f"""
-                <div class="score-card">
+        if ai_result:
 
-                <h2>📊 Skill Match Score</h2>
-
-                <div class="score-number">
-                {score}%
-                </div>
-
-                <p>
-                Estimated compatibility between your current skills
-                and your desired career.
-                </p>
-
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-
-            st.progress(score / 100)
-
-            st.info(get_score_message(score))
-
-
-            # ====================================================
-            # DISCLAIMER
-            # ====================================================
-
-            st.caption(
-                "⚠️ The Skill Match Score is an AI-generated estimate "
-                "based on the information provided. It does not guarantee "
-                "employment or represent official company hiring requirements."
-            )
-
-
-            # ====================================================
-            # AI ANALYSIS RESULT
-            # ====================================================
+            st.success("🎉 Your personalized career analysis is ready!")
 
             st.markdown("---")
 
-            st.markdown("## 🤖 Your Personalized Career Report")
+            st.markdown(ai_result)
 
-            st.markdown(analysis)
+        # =====================================================
+        # FALLBACK IF GEMINI IS BUSY
+        # =====================================================
 
+        else:
 
-            # ====================================================
-            # DOWNLOAD REPORT
-            # ====================================================
-
-            report = f"""
-SKILLBRIDGE AI - PERSONALIZED CAREER REPORT
-
-Name: {name}
-
-Education: {education}
-
-Desired Job Role: {career_goal}
-
-Target Company: {company}
-
-SKILL MATCH SCORE: {score}%
-
---------------------------------------------------
-
-{analysis}
-"""
-
-
-            st.download_button(
-                label="📥 Download My Career Report",
-                data=report,
-                file_name="SkillBridge_AI_Career_Report.txt",
-                mime="text/plain"
+            st.warning(
+                "⚠️ Gemini AI is temporarily busy. "
+                "Showing your SkillBridge career analysis using our backup system."
             )
 
-
-        except Exception as e:
-
-            st.error(
-                "❌ Something went wrong while analyzing your profile."
+            fallback_result = create_fallback_analysis(
+                job_role,
+                skills,
+                company
             )
 
-            st.error(str(e))
+            st.markdown("---")
 
-            st.info(
-                "Please check your Gemini API key, internet connection, "
-                "and API availability."
-            )
+            st.markdown(fallback_result)
 
 
-# ============================================================
-# HOW IT WORKS
-# ============================================================
+# =========================================================
+# HOW SKILLBRIDGE WORKS
+# =========================================================
 
+st.write("")
+st.write("")
 st.markdown("---")
 
-st.markdown("## ⚡ How SkillBridge AI Works")
+st.markdown("# ⚡ How SkillBridge AI Works")
 
+c1, c2, c3, c4 = st.columns(4)
 
-col1, col2, col3, col4 = st.columns(4)
-
-
-with col1:
+with c1:
 
     st.markdown("""
-    ### 👤 1. Profile
+### 👤 1. Profile
 
-    Enter your education,
-    skills and career goal.
-    """)
+Enter your education, skills and career goal.
+""")
 
-
-with col2:
+with c2:
 
     st.markdown("""
-    ### 🤖 2. AI Analysis
+### 🤖 2. AI Analysis
 
-    Our AI analyzes your
-    career profile.
-    """)
+Our AI analyzes your career profile.
+""")
 
-
-with col3:
+with c3:
 
     st.markdown("""
-    ### 📊 3. Skill Gap
+### 📊 3. Skill Gap
 
-    Discover missing
-    and important skills.
-    """)
+Discover missing and important skills.
+""")
 
-
-with col4:
+with c4:
 
     st.markdown("""
-    ### 🚀 4. Roadmap
+### 🚀 4. Roadmap
 
-    Get a personalized
-    learning plan.
-    """)
+Get a personalized learning plan.
+""")
 
 
-# ============================================================
+# =========================================================
 # FOOTER
-# ============================================================
+# =========================================================
 
-st.markdown("""
-<div class="footer">
+st.write("")
+st.markdown("---")
 
-<hr>
-
-🎯 <b>SkillBridge AI</b><br>
-
-Your Skills • Your Path • Your Future
-
-<br><br>
-
-Developed for AI Hackathon | Labour Welfare & Skill Development
-
-</div>
-""", unsafe_allow_html=True)
+st.markdown(
+    "<p style='text-align:center;'>"
+    "🎯 <b>SkillBridge AI</b> | Your Skills. Your Path. Your Future."
+    "</p>",
+    unsafe_allow_html=True
+)
