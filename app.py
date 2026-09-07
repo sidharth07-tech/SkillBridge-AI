@@ -133,9 +133,11 @@ try:
 except Exception:
     pass
 
+
 # If Streamlit Secrets doesn't work, try local .env
 if not api_key:
     api_key = os.getenv("GEMINI_API_KEY")
+
 
 # Stop if API key is missing
 if not api_key:
@@ -147,6 +149,7 @@ if not api_key:
 # Create Gemini Client
 try:
     client = genai.Client(api_key=api_key)
+
 except Exception as e:
     st.error("❌ Unable to initialize Gemini API.")
     st.error(str(e))
@@ -209,14 +212,17 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
 st.markdown("""
 <div class="custom-card">
+
 <h3>🤖 AI-Powered Career & Skill Development Assistant</h3>
 
 <p>
 Discover the skills required for your dream career, identify your skill gaps,
 and receive a personalized learning roadmap designed for your career goals.
 </p>
+
 </div>
 """, unsafe_allow_html=True)
 
@@ -228,6 +234,7 @@ and receive a personalized learning roadmap designed for your career goals.
 st.markdown("## 👤 Build Your Career Profile")
 
 col1, col2 = st.columns(2)
+
 
 with col1:
 
@@ -289,7 +296,9 @@ current_skills = st.text_area(
 
 st.markdown("---")
 
-analyze = st.button("🚀 Analyze My Skills & Build My Career Roadmap")
+analyze = st.button(
+    "🚀 Analyze My Skills & Build My Career Roadmap"
+)
 
 
 # ============================================================
@@ -430,8 +439,12 @@ Keep the response structured, practical, personalized, and suitable for a studen
                 "🤖 SkillBridge AI is analyzing your profile..."
             ):
 
+                # ====================================================
+                # GEMINI AI MODEL
+                # ====================================================
+
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.6-flash",
                     contents=prompt
                 )
 
@@ -450,6 +463,7 @@ Keep the response structured, practical, personalized, and suitable for a studen
             # ====================================================
 
             score = extract_score(analysis)
+
 
             # Remove score line from displayed AI analysis
             analysis = re.sub(
@@ -516,8 +530,11 @@ Keep the response structured, practical, personalized, and suitable for a studen
 SKILLBRIDGE AI - PERSONALIZED CAREER REPORT
 
 Name: {name}
+
 Education: {education}
+
 Desired Job Role: {career_goal}
+
 Target Company: {company}
 
 SKILL MATCH SCORE: {score}%
@@ -526,6 +543,7 @@ SKILL MATCH SCORE: {score}%
 
 {analysis}
 """
+
 
             st.download_button(
                 label="📥 Download My Career Report",
@@ -537,7 +555,9 @@ SKILL MATCH SCORE: {score}%
 
         except Exception as e:
 
-            st.error("❌ Something went wrong while analyzing your profile.")
+            st.error(
+                "❌ Something went wrong while analyzing your profile."
+            )
 
             st.error(str(e))
 
@@ -555,32 +575,45 @@ st.markdown("---")
 
 st.markdown("## ⚡ How SkillBridge AI Works")
 
+
 col1, col2, col3, col4 = st.columns(4)
 
+
 with col1:
+
     st.markdown("""
     ### 👤 1. Profile
+
     Enter your education,
     skills and career goal.
     """)
 
+
 with col2:
+
     st.markdown("""
     ### 🤖 2. AI Analysis
+
     Our AI analyzes your
     career profile.
     """)
 
+
 with col3:
+
     st.markdown("""
     ### 📊 3. Skill Gap
+
     Discover missing
     and important skills.
     """)
 
+
 with col4:
+
     st.markdown("""
     ### 🚀 4. Roadmap
+
     Get a personalized
     learning plan.
     """)
